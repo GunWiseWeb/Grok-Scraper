@@ -32,7 +32,7 @@ for page in range(1, 279):
     # Parse the page source
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     
-    # Find all product links (standard class for this site structure)
+    # Find all product links
     product_links = soup.select('a.product-item-link')
     
     for link in product_links:
@@ -77,7 +77,7 @@ for page in range(1, 279):
                 if len(cells) < 2:
                     continue
                 label = row.find('th').text.strip() if row.find('th') else ''
-                value = cells[0].text.strip()  # In the table structure, it's th for label, td for value
+                value = cells[0].text.strip()
                 if label == 'UPC':
                     upc = value
                 elif label == 'MPN':
