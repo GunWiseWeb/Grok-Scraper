@@ -24,7 +24,6 @@ jobs:
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
-        continue-on-error: false
 
       - name: Verify Chrome Installation
         run: |
@@ -32,31 +31,42 @@ jobs:
             echo "Error: google-chrome not found"
             exit 1
           fi
-          google-chrome --version
+          google-chrome --version || echo "Failed to get Chrome version"
 
       - name: Install Chromedriver
         run: |
           set -e
+          echo "Fetching Chrome version..."
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+' || echo "not found")
           echo "Full Chrome version: $CHROME_VERSION"
           if [ "$CHROME_VERSION" = "not found" ]; then
-            echo "Could not determine Chrome version, attempting to fetch latest Chromedriver"
-            CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
+            echo "Could not determine Chrome version, fetching latest Chromedriver"
+            CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE || echo "not found")
           else
             MAJOR_VERSION=$(echo $CHROME_VERSION | cut -d '.' -f 1)
             echo "Chrome major version: $MAJOR_VERSION"
             CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${MAJOR_VERSION} || echo "not found")
             if [ "$CHROMEDRIVER_VERSION" = "not found" ]; then
-              echo "No Chromedriver version found for major version $MAJOR_VERSION, falling back to latest"
-              CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
+              echo "No Chromedriver for major version $MAJOR_VERSION, trying latest Chromedriver"
+              CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE || echo "not found")
+              if [ "$CHROMEDRIVER_VERSION" = "not found" ]; then
+                echo "Latest Chromedriver fetch failed, falling back to known version 137.0.7166.0"
+                CHROMEDRIVER_VERSION="137.0.7166.0"
+              fi
             fi
           fi
           echo "Using Chromedriver version: $CHROMEDRIVER_VERSION"
-          wget -q https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
-          unzip -q chromedriver_linux64.zip
+          if [ "$CHROMEDRIVER_VERSION" = "not found" ]; then
+            echo "Error: Could not determine any Chromedriver version"
+            exit 1
+          fi
+          echo "Downloading Chromedriver..."
+          wget -q https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip || { echo "Failed to download Chromedriver"; exit 1; }
+          echo "Unzipping Chromedriver..."
+          unzip -q chromedriver_linux64.zip || { echo "Failed to unzip Chromedriver"; exit 1; }
           sudo mv chromedriver /usr/local/bin/chromedriver
           sudo chmod +x /usr/local/bin/chromedriver
-          chromedriver --version
+          chromedriver --version || { echo "Chromedriver verification failed"; exit 1; }
 
       - name: Run scraper
         run: python scraper.py
