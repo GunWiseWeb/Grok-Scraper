@@ -24,16 +24,39 @@ jobs:
         uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
+        continue-on-error: false
+
+      - name: Verify Chrome Installation
+        run: |
+          if ! command -v google-chrome &> /dev/null; then
+            echo "Error: google-chrome not found"
+            exit 1
+          fi
+          google-chrome --version
 
       - name: Install Chromedriver
         run: |
-          CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f 3 | cut -d '.' -f 1)
-          wget -q -O latest_chromedriver_version.txt https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}
-          CHROMEDRIVER_VERSION=$(cat latest_chromedriver_version.txt)
+          set -e
+          CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+' || echo "not found")
+          echo "Full Chrome version: $CHROME_VERSION"
+          if [ "$CHROME_VERSION" = "not found" ]; then
+            echo "Could not determine Chrome version, attempting to fetch latest Chromedriver"
+            CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
+          else
+            MAJOR_VERSION=$(echo $CHROME_VERSION | cut -d '.' -f 1)
+            echo "Chrome major version: $MAJOR_VERSION"
+            CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${MAJOR_VERSION} || echo "not found")
+            if [ "$CHROMEDRIVER_VERSION" = "not found" ]; then
+              echo "No Chromedriver version found for major version $MAJOR_VERSION, falling back to latest"
+              CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE)
+            fi
+          fi
+          echo "Using Chromedriver version: $CHROMEDRIVER_VERSION"
           wget -q https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
           unzip -q chromedriver_linux64.zip
           sudo mv chromedriver /usr/local/bin/chromedriver
           sudo chmod +x /usr/local/bin/chromedriver
+          chromedriver --version
 
       - name: Run scraper
         run: python scraper.py
