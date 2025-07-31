@@ -40,24 +40,26 @@ jobs:
           CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+' || echo "not found")
           echo "Full Chrome version: $CHROME_VERSION"
           if [ "$CHROME_VERSION" = "not found" ]; then
-            echo "Could not determine Chrome version, fetching latest Chromedriver"
+            echo "Could not determine Chrome version, trying latest Chromedriver"
             CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE || echo "not found")
           else
             MAJOR_VERSION=$(echo $CHROME_VERSION | cut -d '.' -f 1)
             echo "Chrome major version: $MAJOR_VERSION"
             CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${MAJOR_VERSION} || echo "not found")
-            if [ "$CHROMEDRIVER_VERSION" = "not found" ]; then
+            if [[ "$CHROMEDRIVER_VERSION" = *"NoSuchKey"* || "$CHROMEDRIVER_VERSION" = "not found" ]]; then
               echo "No Chromedriver for major version $MAJOR_VERSION, trying latest Chromedriver"
               CHROMEDRIVER_VERSION=$(curl -s https://chromedriver.storage.googleapis.com/LATEST_RELEASE || echo "not found")
-              if [ "$CHROMEDRIVER_VERSION" = "not found" ]; then
-                echo "Latest Chromedriver fetch failed, falling back to known version 137.0.7166.0"
-                CHROMEDRIVER_VERSION="137.0.7166.0"
-              fi
             fi
           fi
+          if [[ "$CHROMEDRIVER_VERSION" = "not found" || "$CHROMEDRIVER_VERSION" = *"NoSuchKey"* ]]; then
+            echo "Latest Chromedriver fetch failed, falling back to known version 137.0.7166.0"
+            CHROMEDRIVER_VERSION="137.0.7166.0"
+          fi
           echo "Using Chromedriver version: $CHROMEDRIVER_VERSION"
-          if [ "$CHROMEDRIVER_VERSION" = "not found" ]; then
-            echo "Error: Could not determine any Chromedriver version"
+          if [[ "$CHROMEDRIVER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Valid Chromedriver version format detected"
+          else
+            echo "Error: Invalid Chromedriver version format: $CHROMEDRIVER_VERSION"
             exit 1
           fi
           echo "Downloading Chromedriver..."
